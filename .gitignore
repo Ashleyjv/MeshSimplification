@@ -23,4 +23,5 @@ venv/
 build/
 
 # IDE
-.vscode/
+.vscode/dataset/*.fbx
+dataset/*.stl
