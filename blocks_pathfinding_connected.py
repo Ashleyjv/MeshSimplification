@@ -48,7 +48,7 @@ def create_graph(points, faces, max_height=None):
     return graph
 
 # Define a height constraint (optional)
-max_height_constraint = 10.0
+max_height_constraint = 120.0
 
 # Create graphs
 print("Creating graphs for pathfinding...")
@@ -102,6 +102,7 @@ def get_mapped_or_nearest(node, mapping, simplified_points):
 src_idx = random.choice(list(largest_cc_original))
 dst_idx = random.choice(list(largest_cc_original - {src_idx}))
 
+print(src_idx, dst_idx)
 # Map source and destination nodes
 simplified_src_idx = get_mapped_or_nearest(src_idx, mapping, simplified_points)
 simplified_dst_idx = get_mapped_or_nearest(dst_idx, mapping, simplified_points)
@@ -120,25 +121,25 @@ if nx.has_path(subgraph_simplified, simplified_src_idx, simplified_dst_idx):
 else:
     print("No path found in Simplified Graph.")
 
-# Visualize paths
-if 'path_original' in locals() and 'path_simplified' in locals():
-    path_points_original = np.array([original_points[node] for node in path_original])
-    path_points_simplified = np.array([simplified_points[node] for node in path_simplified])
+# # Visualize paths
+# if 'path_original' in locals() and 'path_simplified' in locals():
+#     path_points_original = np.array([original_points[node] for node in path_original])
+#     path_points_simplified = np.array([simplified_points[node] for node in path_simplified])
 
-    # Create line segments for visualization
-    line_segments_original = np.vstack([path_points_original[:-1], path_points_original[1:]]).reshape(-1, 3)
-    line_segments_simplified = np.vstack([path_points_simplified[:-1], path_points_simplified[1:]]).reshape(-1, 3)
+#     # Create line segments for visualization
+#     line_segments_original = np.vstack([path_points_original[:-1], path_points_original[1:]]).reshape(-1, 3)
+#     line_segments_simplified = np.vstack([path_points_simplified[:-1], path_points_simplified[1:]]).reshape(-1, 3)
 
-    plotter = pv.Plotter(shape=(1, 2))
-    plotter.subplot(0, 0)
-    plotter.add_mesh(mesh, color="blue", show_edges=True)
-    plotter.add_lines(line_segments_original, color="red", width=5)
-    plotter.add_text("Original Mesh", font_size=10)
+#     plotter = pv.Plotter(shape=(1, 2))
+#     plotter.subplot(0, 0)
+#     plotter.add_mesh(mesh, color="blue", show_edges=True)
+#     plotter.add_lines(line_segments_original, color="red", width=5)
+#     plotter.add_text("Original Mesh", font_size=10)
 
-    plotter.subplot(0, 1)
-    plotter.add_mesh(simplified_mesh, color="green", show_edges=True)
-    plotter.add_lines(line_segments_simplified, color="red", width=5)
-    plotter.add_text("Simplified Mesh", font_size=10)
+#     plotter.subplot(0, 1)
+#     plotter.add_mesh(simplified_mesh, color="green", show_edges=True)
+#     plotter.add_lines(line_segments_simplified, color="red", width=5)
+#     plotter.add_text("Simplified Mesh", font_size=10)
 
-    plotter.link_views()
-    plotter.show()
+#     plotter.link_views()
+#     plotter.show()
