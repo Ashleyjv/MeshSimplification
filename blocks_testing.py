@@ -1,5 +1,16 @@
 import pyvista as pv
 import fast_simplification
+import sys
+
+DEBUG = True
+
+def debug(*args, sep=' ', end='\n', file=None, flush=False):
+    # Check the environment variable
+    if DEBUG:
+        # If file is None, default to sys.stdout, just like print
+        if file is None:
+            file = sys.stdout
+        print(*args, sep=sep, end=end, file=file, flush=flush)
 
 # Path to the dataset
 dataset_path = "dataset/city.stl"

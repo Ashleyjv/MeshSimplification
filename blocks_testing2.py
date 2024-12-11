@@ -5,8 +5,17 @@ import numpy as np
 import random
 import sys
 from scipy.spatial import KDTree
+from rrt_model import RRT
 
 DEBUG = True
+
+def debug(*args, sep=' ', end='\n', file=None, flush=False):
+    # Check the environment variable
+    if DEBUG:
+        # If file is None, default to sys.stdout, just like print
+        if file is None:
+            file = sys.stdout
+        print(*args, sep=sep, end=end, file=file, flush=flush)
 
 def load_mesh(dataset_path):
         # Load the STL file
@@ -17,16 +26,10 @@ def load_mesh(dataset_path):
     original_points = original_mesh.points.tolist()
     original_faces = original_mesh.faces.reshape(-1, 4)[:, 1:]  # Extract triangle indices
     nested_faces = original_faces.tolist()
+    (xmin, xmax, ymin, ymax, zmin, zmax) = original_mesh.bounds
+
 
     return original_mesh, original_points, nested_faces
-
-def debug(*args, sep=' ', end='\n', file=None, flush=False):
-    # Check the environment variable
-    if DEBUG:
-        # If file is None, default to sys.stdout, just like print
-        if file is None:
-            file = sys.stdout
-        print(*args, sep=sep, end=end, file=file, flush=flush)
 
 def get_simplified_mesh(original_points, nested_faces, tg_red=0.5):
     # Simplify the mesh
@@ -58,19 +61,20 @@ def create_graph(points, faces, max_height=None):
     for i, point in enumerate(points):
         graph.add_node(i, pos=tuple(point))
     for face in faces:
+        # print(len(face), face)
         for j in range(len(face)):
             # Connect vertices if the height constraint is met
             if max_height is None or abs(points[face[j]][2] - points[face[(j + 1) % len(face)]][2]) <= max_height:
                 graph.add_edge(face[j], face[(j + 1) % len(face)])  # Connect vertices cyclically
     return graph
 
-def get_graph_stats(points, faces, queries):
+def get_graph_stats(points, faces, mesh, queries):
     # Helper function to extract path points
     def get_path_points(path, pts):
         return np.array([pts[idx] for idx in path])
 
     max_height_constraint = 10.0
-    graph = create_graph(points, faces, max_height=max_height_constraint)
+    # graph = create_graph(points, faces, max_height=max_height_constraint)
     stats = {
         "n_nodes" : 0,
         "dijkstra" : [],
@@ -83,21 +87,43 @@ def get_graph_stats(points, faces, queries):
         # Validate path existence
 
         # Find shortest paths
+
+        src_idx = random.randint(0, len(points) - 1)
+        dst_idx = random.randint(0, len(points) - 1)
         debug("Computing paths...")
         try:
-            # need to measure runtime here
-            path = nx.dijkstra_path(graph, source=src_idx, target=dst_idx, weight=None)
-            path_points = get_path_points(path, points)
-            stats["dijkstra"].append(path_points)
 
-            path = nx.astar_path(graph, source=src_idx, target=dst_idx, weight=None)
-            path_points = get_path_points(path, points)
-            stats["astar"].append(path_points)
+            debug("Start:", src_idx, points[src_idx])
+            debug("Goal:", src_idx, points[src_idx])
+            rrt = RRT(
+                start=points[src_idx],
+                goal=points[dst_idx],
+                mesh=mesh,
+                step_size=5.0,
+                max_iter=5000,
+                goal_sample_rate=0.1,
+                search_radius=5.0
+            )
+
+            # Build RRT and extract path
+            path = rrt.build_rrt()
+            print(path)
+            stats["rrt"].append(path)
+            # need to measure runtime here
+            # path = nx.dijkstra_path(graph, source=src_idx, target=dst_idx, weight=None)
+            # path_points = get_path_points(path, points)
+            # stats["dijkstra"].append(path_points)
+
+            # path = nx.astar_path(graph, source=src_idx, target=dst_idx, weight=None)
+            # path_points = get_path_points(path, points)
+            # stats["astar"].append(path_points)
         except nx.NetworkXNoPath as e:      # no path
             debug(e)
             stats["dijkstra"].append(None)
             stats["astar"].append(None)
-
+        except AssertionError as e:
+            debug(e)
+            return get_graph_stats(points, faces, mesh, queries)
         # path = nx.dijkstra_path(graph, source=src_idx, target=dst_idx, weight=None)
 
         # path_points = get_path_points(path, points)
@@ -164,14 +190,14 @@ def get_mesh_stats(dataset_path, queries):
     
     debug("Creating graphs for pathfinding...")
 
-    original_stats = get_graph_stats(original_points, nested_faces, queries)
+    original_stats = get_graph_stats(original_points, nested_faces, original_mesh, queries)
 
     mapped_queries = get_mapped_queries(simplified_points, original_points, mapping, queries)
 
-    simplified_stats = get_graph_stats(simplified_points, simplified_faces, mapped_queries)
+    simplified_stats = get_graph_stats(simplified_points, simplified_faces, simplified_mesh, mapped_queries)
 
     if DEBUG:
-        visualize(original_mesh, simplified_mesh, original_stats["dijkstra"], simplified_stats["dijkstra"])
+        visualize(original_mesh, simplified_mesh, original_stats["rrt"], simplified_stats["rrt"])
 
     # summarize stats using dictionaries
 
