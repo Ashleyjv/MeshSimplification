@@ -99,10 +99,10 @@ def get_graph_stats(points, faces, mesh, queries):
                 start=points[src_idx],
                 goal=points[dst_idx],
                 mesh=mesh,
-                step_size=5.0,
+                step_size=1.0,
                 max_iter=5000,
                 goal_sample_rate=0.1,
-                search_radius=5.0
+                search_radius=1.0
             )
 
             # Build RRT and extract path
@@ -212,7 +212,7 @@ def get_mesh_stats(dataset_path, queries):
 
 test_suite = [
     (
-        "dataset/city.stl", [
+        "dataset/building.stl", [
                                 (1897518, 1894639)
                             ]
     ),

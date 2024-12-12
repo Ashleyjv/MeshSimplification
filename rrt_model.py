@@ -30,6 +30,7 @@ class RRT:
         :param goal_sample_rate: Probability of sampling the goal.
         :param search_radius: Radius to consider goal reached.
         """
+
         self.start = np.array(start)
         self.goal = np.array(goal)
         self.mesh = mesh
@@ -49,7 +50,7 @@ class RRT:
 
         assert(self.is_collision_free(self.start, self.start))
         assert(self.is_collision_free(self.goal, self.goal))
-    
+
     def get_random_point(self, bounds, rate):
         if random.random() < rate:
             return self.goal
@@ -86,18 +87,28 @@ class RRT:
         
         if points.size == 0:
             return True  # No collision
-    
         # Calculate the distance from from_point to the first intersection point
         # If this distance is less than the distance between from_point and to_point,
         # there is a collision
         cell = self.mesh.get_cell(points[0])
-        print(self.mesh.get_cell(points[0]))
-        
 
         # Define segment start and end points
         y = np.array(from_point)
         z = np.array(to_point)
         direction = z - y
+
+        if np.array_equal(y, z):
+            bounds = cell.bounds
+            ok = True
+            for i in range(3):
+                if bounds[2 * i] <= y[i] and y[i] <= bounds[2 * i + 1]:
+                    pass
+                else:
+                    ok = False
+            print(bounds)
+            print("start", y)
+            return not ok
+        # direction = direction / np.linalg.norm(direction)
 
         tmin = 0.0
         tmax = 1.0
@@ -118,6 +129,11 @@ class RRT:
 
         if tmin <= tmax and tmin <= 1 and tmax >= 0:
             # Intersection occurs within the segment
+            o = y + direction * tmin
+            print(o, to_point, from_point)
+            print(cell.bounds)
+            print((o - y) / np.linalg.norm(o - y))
+            print((o - z) / np.linalg.norm(o - z))
             return False  # Collision detected
 
         return True  # No collision within the segment
