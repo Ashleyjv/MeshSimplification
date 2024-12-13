@@ -187,11 +187,97 @@ class LazyGraph:
         debug("Reached maximum iterations without finding a path.")
         return None, None
 
+    def a_star(self):
+        debug("A* algorithm started...")
+        start_time = time.time()
+
+        # Define the 6 cardinal directions
+        dirs_3d = [
+            (1,  0,  0),  # East
+            (0,  1,  0),  # North
+            (-1, 0,  0),  # West
+            (0, -1,  0),  # South
+            (0,  0,  1),  # Up
+            (0,  0, -1)   # Down
+        ]
+
+        heapq.heappush(self.pq, (0 + self.heuristic(self.start), self.start))
+        self.set_distance(self.start, 0)
+
+        while self.pq and self.max_iter > 0:
+            current_f, current_node = heapq.heappop(self.pq)
+
+            dist = current_f - self.heuristic(current_node)
+
+            if self.get_distance(current_node) != dist:
+                continue
+
+            # Check if goal is reached within search radius
+            distance_to_goal = self.distance(current_node, self.goal)
+            if distance_to_goal <= self.search_radius:
+                if self.is_collision_free(current_node, self.goal):
+                    self.tree.add_node(self.goal, parent=current_node)
+                    final_dist = dist + distance_to_goal
+                    self.set_distance(self.goal, final_dist)
+                    debug("Goal reached.")
+                    self.rtime = time.time() - start_time
+                    path, total_distance = self.extract_path()
+                    return path, total_distance
+
+            # Explore all 6 cardinal directions
+            for (dx, dy, dz) in dirs_3d:
+                next_node = (
+                    current_node[0] + dx * self.step_size,
+                    current_node[1] + dy * self.step_size,
+                    current_node[2] + dz * self.step_size
+                )
+
+                if not self.is_collision_free(current_node, next_node):
+                    continue  # Collision detected, skip this node
+
+                tentative_g = dist + self.distance(current_node, next_node)
+
+                if next_node not in self.distances or tentative_g < self.get_distance(next_node):
+                    self.set_distance(next_node, tentative_g)
+                    f_score = tentative_g + self.heuristic(next_node)
+                    heapq.heappush(self.pq, (f_score, next_node))
+                    self.tree.add_node(next_node, parent=current_node)
+
+            # Add direction towards the goal
+            direction_to_goal = np.array(self.goal) - np.array(current_node)
+            norm = np.linalg.norm(direction_to_goal)
+            if norm != 0:
+                direction_unit = direction_to_goal / norm
+                next_node_goal = (
+                    current_node[0] + direction_unit[0] * self.step_size,
+                    current_node[1] + direction_unit[1] * self.step_size,
+                    current_node[2] + direction_unit[2] * self.step_size
+                )
+
+                next_node_goal = tuple(next_node_goal)
+
+                if self.is_collision_free(current_node, next_node_goal):
+                    tentative_g_goal = dist + self.distance(current_node, next_node_goal)
+                    if next_node_goal not in self.distances or tentative_g_goal < self.get_distance(next_node_goal):
+                        self.set_distance(next_node_goal, tentative_g_goal)
+                        f_score_goal = tentative_g_goal + self.heuristic(next_node_goal)
+                        heapq.heappush(self.pq, (f_score_goal, next_node_goal))
+                        self.tree.add_node(next_node_goal, parent=current_node)
+
+            self.max_iter -= 1
+
+        debug("Reached maximum iterations without finding a path.")
+        self.rtime = time.time() - start_time
+        return None, None
+
     def distance(self, point1, point2):
         """
         Calculates Euclidean distance between two 3D points.
         """
         return np.linalg.norm(np.array(point2) - np.array(point1))
+
+    def heuristic(self, node):
+        return np.linalg.norm(np.array(node) - np.array(self.goal))
 
     def extract_path(self):
         path = []
@@ -205,3 +291,4 @@ class LazyGraph:
             current = parent
         path.reverse()
         return path, dist
+

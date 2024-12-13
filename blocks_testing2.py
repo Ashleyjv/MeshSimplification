@@ -11,7 +11,7 @@ import heapq
 import json
 import threading
 
-DEBUG = False
+DEBUG = True
 
 def debug(*args, sep=' ', end='\n', file=None, flush=False):
     # Check the environment variable
@@ -134,7 +134,7 @@ def get_graph_stats(points, faces, mesh, params):
             stats["rrt"] = path
 
         def run_dijkstra():
-            path, dist = graph.dijkstra()
+            path, dist = graph.a_star()
             stats["dijtime"] = graph.rtime
             stats["dijdist"] = dist
             stats["dijkstra"] = path
@@ -240,7 +240,7 @@ def get_mesh_stats(dataset_path, params):
 
     simplified_stats = get_graph_stats(simplified_points, simplified_faces, simplified_mesh, params)
 
-    test_results = params + {
+    test_results = params | {
         "file" : dataset_path,
         "original" : original_stats,
         "simplified" : simplified_stats
