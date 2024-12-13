@@ -4,10 +4,11 @@ import networkx as nx
 import random
 from scipy.spatial import KDTree
 import sys
+import time
 
 def debug(*args, sep=' ', end='\n', file=None, flush=False):
     # Check the environment variable
-    if True:
+    if False:
         # If file is None, default to sys.stdout, just like print
         if file is None:
             file = sys.stdout
@@ -41,7 +42,7 @@ class RRT:
         self.search_radius = search_radius
         self.tree = nx.DiGraph()
         self.tree.add_node(tuple(self.start), parent=None)
-        
+        self.rtime = 0
         # For nearest neighbor search
         self.kdtree = KDTree([self.start])
         self.nodes = [self.start]
@@ -83,6 +84,7 @@ class RRT:
         # It returns a tuple (points, ids)
         # If points is empty, there is no intersection
         # If points exist, check if the intersection is within the segment
+
         points = self.mesh.find_cells_intersecting_line(from_point, to_point)
         
         if points.size == 0:
@@ -91,6 +93,7 @@ class RRT:
         # If this distance is less than the distance between from_point and to_point,
         # there is a collision
         cell = self.mesh.get_cell(points[0])
+        # print(cell)
 
         # Define segment start and end points
         y = np.array(from_point)
@@ -105,8 +108,6 @@ class RRT:
                     pass
                 else:
                     ok = False
-            print(bounds)
-            print("start", y)
             return not ok
         # direction = direction / np.linalg.norm(direction)
 
@@ -129,29 +130,18 @@ class RRT:
 
         if tmin <= tmax and tmin <= 1 and tmax >= 0:
             # Intersection occurs within the segment
-            o = y + direction * tmin
-            print(o, to_point, from_point)
-            print(cell.bounds)
-            print((o - y) / np.linalg.norm(o - y))
-            print((o - z) / np.linalg.norm(o - z))
             return False  # Collision detected
 
         return True  # No collision within the segment
-
-
-        print(self.mesh.get_cell(points[0]), random_pt)
-        intersection_distance = np.linalg.norm(random_pt - from_point)
-        total_distance = np.linalg.norm(to_point - from_point)
-        
-        if intersection_distance < total_distance:
-            return False  # Collision detected
-        return True  # No collision
     
     def build_rrt(self):
         """
         Builds the RRT tree.
         """
         debug("RRT started...")
+
+        start_time = time.time()
+
         bounds = self.mesh.bounds  # (xmin, xmax, ymin, ymax, zmin, zmax)
         for i in range(self.max_iter):
             rand_point = self.get_random_point(bounds, self.goal_sample_rate)
@@ -159,7 +149,10 @@ class RRT:
             nearest_point = self.nodes[nearest_idx]
             new_point = self.steer(nearest_point, rand_point)
             
-            if self.is_collision_free(nearest_point, new_point):
+            # nearest pt is visited node
+            # new point is newly sampled node
+            # move from nearest --> newpt if no collision
+            if self.is_collision_free(nearest_point, new_point): # always finds collision
                 self.tree.add_node(tuple(new_point), parent=tuple(nearest_point))
                 self.nodes.append(new_point)
                 self.kdtree = KDTree(self.nodes)  # Update KDTree with the new node
@@ -169,6 +162,11 @@ class RRT:
                 if np.linalg.norm(new_point - self.goal) <= self.search_radius:
                     if self.is_collision_free(new_point, self.goal):
                         self.tree.add_node(tuple(self.goal), parent=tuple(new_point))
+                        # Stop the clock
+                        end_time = time.time()
+                        elapsed_time = end_time - start_time
+                        self.rtime = elapsed_time
+                        debug(f"Runtime: {elapsed_time:.6f} seconds")
                         debug(f"Goal reached in {i+1} iterations.")
                         return self.extract_path()
         
@@ -176,11 +174,14 @@ class RRT:
         return None
     
     def extract_path(self):
-        path = [tuple(self.goal)]
+        path = []
         current = tuple(self.goal)
+        dist = 0
         while self.tree.nodes[current]['parent'] is not None:
             parent = self.tree.nodes[current]['parent']
+            path.append(current)
             path.append(parent)
+            dist += np.linalg.norm(np.array(parent) - np.array(current))
             current = parent
         path.reverse()
-        return path
+        return path, dist
