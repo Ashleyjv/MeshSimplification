@@ -313,7 +313,10 @@ def plot_stats(stats):
         ax.set_xticklabels(categories)
         ax.legend()
 
-        plt.show()
+        # plt.show()
+        plt.savefig(f"{metric}_statistics.png")  # Save the plot as a PNG file
+        plt.close()  # Close the figure to free memory
+
 
 def save_summary(stats, filename="summary.csv"):
     """Save the numerical summary to a CSV file."""

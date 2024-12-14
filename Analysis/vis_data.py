@@ -195,7 +195,11 @@ def plot_metric(metric_original, metric_simplified, metric_name, ylabel):
                         ha='center', va='bottom')
 
     plt.tight_layout()
-    plt.show()
+    # plt.show()
+    plt.tight_layout()
+    plt.savefig(f'{metric_name}_comparison.png')  # Save the plot as a PNG file
+    plt.close()  # Close the figure to free memory
+
 
 # Plot each metric
 plot_metric(original_rrt_dist, simplified_rrt_dist, "RRT Distance", "Distance")
