@@ -6,8 +6,9 @@ from scipy.spatial import KDTree
 import sys
 import time
 import heapq
+import math
 
-EPS = 0.1
+EPS = 0.8
 
 def debug(*args, sep=' ', end='\n', file=None, flush=False):
     # Check the environment variable
@@ -17,6 +18,58 @@ def debug(*args, sep=' ', end='\n', file=None, flush=False):
             file = sys.stdout
         print(*args, sep=sep, end=end, file=file, flush=flush)
 
+def create_cell_bins(mesh, step_sz):
+    # Extract mesh bounds
+    xmin, xmax, ymin, ymax, zmin, zmax = mesh.bounds
+    print(f"Mesh x-range: [{xmin}, {xmax}]")
+
+    # Calculate the number of bins needed
+    num_bins = math.ceil((xmax - xmin) / step_sz)
+    print(f"Number of bins: {num_bins}")
+
+    # Initialize a list to hold cell indices for each bin
+    cell_bins_indices = [[] for _ in range(num_bins)]
+
+    cell_centroids = mesh.cell_centers().points
+
+    for cell_id in range(mesh.n_cells):
+        centroid_x = cell_centroids[cell_id][0]  # Extract x-coordinate of centroid
+        bin_idx = int((centroid_x - xmin) / step_sz)
+        if bin_idx == num_bins:
+            bin_idx -= 1
+        bin_idx = max(0, min(bin_idx, num_bins - 1))
+        cell_bins_indices[bin_idx].append(cell_id)
+
+    cell_bins = []
+    for i in range(num_bins):
+        cell_indices = cell_bins_indices[i]
+        if not cell_indices:
+            cell_bins.append(pv.PolyData())
+            continue
+        extracted = mesh.extract_cells(cell_indices)
+        extracted.clean()
+        cell_bins.append(extracted)
+        debug(f"Bin {i}: x-range=[{xmin + i * step_sz}, {xmin + (i + 1) * step_sz}) - Cells: {len(cell_indices)}")
+
+    return cell_bins
+
+def get_relevant_bins(x, y, xmin, step_sz, num_bins):
+    x_start = min(x[0], y[0])
+    x_end = max(x[0], y[0])
+
+    # Calculate bin indices
+    bin_start = int((x_start - xmin) / step_sz)
+    bin_end = int((x_end - xmin) / step_sz)
+
+    # Handle edge cases
+    bin_start = max(0, min(bin_start, num_bins - 1))
+    bin_end = max(0, min(bin_end, num_bins - 1))
+
+    # Collect all bin indices that overlap with the line segment's x-range
+    relevant_bin_indices = range(bin_start, bin_end + 1)
+
+    return relevant_bin_indices
+
 class LazyGraph:
     def __init__(self, start, goal, mesh, 
                  step_size=1.0, 
@@ -25,7 +78,8 @@ class LazyGraph:
 
         self.start = tuple(start)
         self.goal = tuple(goal)
-        self.mesh = mesh
+        self.bounds = mesh.bounds
+        self.mesh_bins = create_cell_bins(mesh, step_size)
         self.mpoints = mesh.points.tolist()
         self.step_size = step_size
         self.max_iter = max_iter
@@ -38,7 +92,7 @@ class LazyGraph:
         self.pq = []
         self.distances = {}
 
-        print("Mesh Bounds:", mesh.bounds)
+        print("Mesh Bounds:", self.bounds)
 
         assert(self.is_collision_free(self.start, self.start))
         assert(self.is_collision_free(self.goal, self.goal))
@@ -46,20 +100,20 @@ class LazyGraph:
     def upd_tree(self):
         self.kdtree = KDTree(list(self.distances.keys()))
 
-    def is_collision_free(self, from_point, to_point):
+    def collision_free(self, from_point, to_point, index):
         # Use PyVista's intersect_with_line method
         # It returns a tuple (points, ids)
         # If points is empty, there is no intersection
         # If points exist, check if the intersection is within the segment
 
-        points = self.mesh.find_cells_intersecting_line(from_point, to_point)
+        points = self.mesh_bins[index].find_cells_intersecting_line(from_point, to_point)
         
         if points.size == 0:
             return True  # No collision
         # Calculate the distance from from_point to the first intersection point
         # If this distance is less than the distance between from_point and to_point,
         # there is a collision
-        cell = self.mesh.get_cell(points[0])
+        cell = self.mesh_bins[index].get_cell(points[0])
         # print(cell)
 
         # Define segment start and end points
@@ -101,6 +155,14 @@ class LazyGraph:
 
         return True  # No collision within the segment
 
+    def is_collision_free(self, from_point, to_point):
+        bins = get_relevant_bins(from_point, to_point, self.bounds[0], 
+                                self.step_size, len(self.mesh_bins))
+        for i in bins:
+            if not self.collision_free(from_point, to_point, i):
+                return False
+        return True
+
     def set_distance(self, node, dist):
         self.distances[tuple(node)] = dist
 
@@ -108,6 +170,10 @@ class LazyGraph:
         return self.distances[tuple(node)]
     
     def fix_point(self, point):
+        new_pt = []
+        for i in range(3):
+            new_pt.append(round(point[i], 1))
+        point = tuple(new_pt)
         nearest_pt = self.kdtree.query(point)[0]
         if self.distance(point, nearest_pt) <= EPS:
             return nearest_pt
@@ -173,6 +239,7 @@ class LazyGraph:
 
                 if next_node not in self.distances or new_dist < self.get_distance(next_node):
                     self.set_distance(next_node, new_dist)
+                    debug(next_node, " added.")
                     heapq.heappush(self.pq, (new_dist, next_node))
                     self.tree.add_node(next_node, parent=current_node)
 
@@ -192,7 +259,8 @@ class LazyGraph:
                 if self.is_collision_free(current_node, next_node_goal):
                     new_dist_goal = current_dist + self.distance(current_node, next_node_goal)
                     if next_node_goal not in self.distances or new_dist_goal < self.distances[next_node_goal]:
-                        self.distances[next_node_goal] = new_dist_goal
+                        self.set_distance(next_node_goal, new_dist_goal)
+                        debug(next_node_goal, " added.")
                         heapq.heappush(self.pq, (new_dist_goal, next_node_goal))
                         self.tree.add_node(next_node_goal, parent=current_node)
 

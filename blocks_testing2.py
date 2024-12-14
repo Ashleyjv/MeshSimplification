@@ -10,8 +10,9 @@ from lazy_graph import LazyGraph
 import heapq
 import json
 import threading
+import math
 
-DEBUG = True
+DEBUG = False
 
 def debug(*args, sep=' ', end='\n', file=None, flush=False):
     # Check the environment variable
@@ -20,6 +21,38 @@ def debug(*args, sep=' ', end='\n', file=None, flush=False):
         if file is None:
             file = sys.stdout
         print(*args, sep=sep, end=end, file=file, flush=flush)
+
+def visualize(mesh, simplified_mesh, orig_paths, simpl_paths):
+    # Visualize
+    debug("Visualizing paths...")
+    plotter = pv.Plotter(shape=(1, 2))
+
+    colors = ["red", "black", "orange", "purple"]
+    # Original mesh with path
+    plotter.subplot(0, 0)
+    plotter.add_mesh(mesh, color="blue", show_edges=True)
+    # orig_paths = random.sample(orig_paths, min(len(orig_paths), 4))
+    # for i in range(len(orig_paths)):
+    #     if orig_paths[i] is None:
+    #         continue
+    lines = pv.line_segments_from_points(orig_paths)
+    plotter.add_mesh(lines, color=colors[0])
+    plotter.add_text("Original Mesh with Path", font_size=10)
+
+    # Simplified mesh with path
+    plotter.subplot(0, 1)
+    plotter.add_mesh(simplified_mesh, color="green", show_edges=True)
+    # simpl_paths = random.sample(simpl_paths, min(len(simpl_paths), 4))
+    # for i in range(len(simpl_paths)):
+    #     if simpl_paths[i] is None:
+    #         continue
+    lines = pv.line_segments_from_points(simpl_paths)
+    plotter.add_mesh(lines, color=colors[0])
+    plotter.add_text("Simplified Mesh with Path", font_size=10)
+
+    # Show the plot
+    plotter.link_views()
+    plotter.show()
 
 def get_random_point(bounds):
     return np.array([
@@ -66,19 +99,6 @@ def get_simplified_mesh(original_points, nested_faces, tg_red=0.5):
 
     return simplified_mesh, simplified_points, simplified_faces, mapping
 
-# Function to create a graph from a mesh
-def create_graph(points, faces, max_height=None):
-    graph = nx.Graph()
-    for i, point in enumerate(points):
-        graph.add_node(i, pos=tuple(point))
-    for face in faces:
-        # print(len(face), face)
-        for j in range(len(face)):
-            # Connect vertices if the height constraint is met
-            if max_height is None or abs(points[face[j]][2] - points[face[(j + 1) % len(face)]][2]) <= max_height:
-                graph.add_edge(face[j], face[(j + 1) % len(face)])  # Connect vertices cyclically
-    return graph
-
 def get_graph_stats(points, faces, mesh, params):
     # Helper function to extract path points
     def get_path_points(path, pts):
@@ -103,8 +123,8 @@ def get_graph_stats(points, faces, mesh, params):
     debug("Computing paths...")
     try:
 
-        start = params["start"] #get_random_point(mesh.bounds)
-        goal = params["goal"]   #get_random_point(mesh.bounds)
+        start = params["start"] #get_random_point(mesh.bounds) #
+        goal = params["goal"]   #get_random_point(mesh.bounds) # 
         debug("Start:", start)
         debug("Goal:", goal)
         rrt = RRT(
@@ -181,80 +201,24 @@ def get_graph_stats(points, faces, mesh, params):
         # path = nx.astar_path(graph, source=src_idx, target=dst_idx, weight=None)
         # path_points = get_path_points(path, points)
         # stats["astar"].append(path_points)
-    except nx.NetworkXNoPath as e:      # no path
+    except Exception as e:      # no path
         debug(e)
         stats["dijkstra"].append(None)
         stats["astar"].append(None)
     except AssertionError as e:
         debug(e)
-        return get_graph_stats(points, faces, mesh, queries)
-        # path = nx.dijkstra_path(graph, source=src_idx, target=dst_idx, weight=None)
-
-        # path_points = get_path_points(path, points)
-
-        # stats["dijkstra"].append(path_points)
+        # return get_graph_stats(points, faces, mesh, queries)
     return stats
 
-def visualize(mesh, simplified_mesh, orig_paths, simpl_paths):
-    # Visualize
-    debug("Visualizing paths...")
-    plotter = pv.Plotter(shape=(1, 2))
-
-    colors = ["red", "black", "orange", "purple"]
-    # Original mesh with path
-    plotter.subplot(0, 0)
-    plotter.add_mesh(mesh, color="blue", show_edges=True)
-    # orig_paths = random.sample(orig_paths, min(len(orig_paths), 4))
-    # for i in range(len(orig_paths)):
-    #     if orig_paths[i] is None:
-    #         continue
-    lines = pv.line_segments_from_points(orig_paths)
-    print(lines)
-    plotter.add_mesh(lines, color=colors[0])
-    plotter.add_text("Original Mesh with Path", font_size=10)
-
-    # Simplified mesh with path
-    plotter.subplot(0, 1)
-    plotter.add_mesh(simplified_mesh, color="green", show_edges=True)
-    # simpl_paths = random.sample(simpl_paths, min(len(simpl_paths), 4))
-    # for i in range(len(simpl_paths)):
-    #     if simpl_paths[i] is None:
-    #         continue
-    lines = pv.line_segments_from_points(simpl_paths)
-    plotter.add_mesh(lines, color=colors[0])
-    plotter.add_text("Simplified Mesh with Path", font_size=10)
-
-    # Show the plot
-    plotter.link_views()
-    plotter.show()
-
-def get_mapped_queries(simpl_pts, og_pts, mapping, queries):
-    # Create a KDTree for nearest neighbor mapping
-    simplified_tree = KDTree(simpl_pts)
-
-    # Helper function to remap isolated nodes
-    def get_mapped_or_nearest(node, mapping, simplified_points):
-        if node < len(mapping) and mapping[node] != -1:  # Check if node is mapped
-            return mapping[node]
-        # Fallback to nearest node in simplified points
-        # original_point = og_pts[node]
-        nearest_idx = simplified_tree.query(node)[1]
-        print(f"Node {node} not mapped, using nearest node {nearest_idx}")
-        return nearest_idx
-
-    # Select source and destination nodes for pathfinding
-    mapped_queries = []
-    for (src_idx, dst_idx) in queries:
-        simplified_src_idx = get_mapped_or_nearest(src_idx, mapping, simpl_pts)
-        simplified_dst_idx = get_mapped_or_nearest(dst_idx, mapping, simpl_pts)
-        mapped_queries.append((simplified_src_idx, simplified_dst_idx))
-    return mapped_queries
 
 def get_mesh_stats(dataset_path, params):
+    random.seed(params["seed"])
+
     original_mesh, original_points, nested_faces = load_mesh(dataset_path)
 
     simplified_mesh, simplified_points, simplified_faces, mapping = get_simplified_mesh(original_points, nested_faces)
     
+
     debug("Creating graphs for pathfinding...")
 
     original_stats = get_graph_stats(original_points, nested_faces, original_mesh, params)
@@ -267,7 +231,7 @@ def get_mesh_stats(dataset_path, params):
         "simplified" : simplified_stats
     }
 
-    with open(dataset_path + '_' + params['test_num'] + '.json', 'w') as file:
+    with open(dataset_path + '_' + str(params['test_num']) + '.json', 'w') as file:
         json.dump(test_results, file, indent=4)
     print(test_results)
     visualize(original_mesh, simplified_mesh, original_stats["dijkstra"], simplified_stats["dijkstra"]) #simplified_stats["rrt"])
@@ -286,13 +250,34 @@ def get_mesh_stats(dataset_path, params):
 test_suite = [
     (
         "dataset/city.stl", {
-            "start" : [345.61178723, 567.61959214,  76.7230741 ],
-            "goal" : [270.5884959,  525.02272572,  74.67635382],
-            "max_iter" : 5000,
-            "step_size" : 3,
+            "start" : [216, 678, 22],
+            "goal" : [232, 646.6, 52.6],
+            "max_iter" : 10000,
+            "step_size" : 8,
+            "seed" : 420,
             "test_num" : '1'
         }
     ),
+    # (
+    #     "dataset/city.stl", {
+    #         "start" : [345.61178723, 567.61959214,  76.7230741 ],
+    #         "goal" : [270.5884959,  525.02272572,  74.67635382],
+    #         "max_iter" : 10000,
+    #         "step_size" : 8,
+    #         "seed" : 420,
+    #         "test_num" : '1'
+    #     }
+    # ),
+    # (
+    #     "dataset/building.stl", {
+    #         "start" : [ 7.24923402, 17.4842314,   3.39377013],
+    #         "goal" : [-9.49016435, -5.69409026,  1.61244157],
+    #         "max_iter" : 5000,
+    #         "step_size" : 1,
+    #         "seed" : 23,
+    #          "test_num" : 2
+    #     }
+    # ),
     # (
     #     "dataset/city.stl", {
     #         "start" : [284.07548918, 730.13227684,  55.99260382],
