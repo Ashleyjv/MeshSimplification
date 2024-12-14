@@ -101,3 +101,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+#python visualize_dataset_tests.py --dataset dataset/city.stl --output test_cases.json --num_cases 10 --visualize

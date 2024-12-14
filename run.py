@@ -255,19 +255,30 @@ def main():
     parser.add_argument("--dataset", type=str, required=True, help="Path to the dataset STL file")
     parser.add_argument("--algo", type=str, choices=["dijkstra", "astar", "rrt", "all"], default="all", help="Algorithm to run")
     parser.add_argument("--visualize", action="store_true", help="Visualize paths")
-    parser.add_argument("--test", type=int, default=1, help="Test number identifier")
+    parser.add_argument("--test-cases", type=str, help="Path to the JSON file containing start/goal test cases", required=True)
     args = parser.parse_args()
 
-    params = {
-        "start": [339.1016803289266, 582.9962490572758, 46.49762527845365],
-        "goal": [247.84518536459262, 610.0980811099635, 51.94418636638621],
-        "max_iter": 5000,
-        "step_size": 2,
-        "test_num": args.test,
-        "visualize": args.visualize
-    }
+    # Load test cases from the provided JSON file
+    try:
+        with open(args.test_cases, 'r') as f:
+            test_cases = json.load(f)
+    except Exception as e:
+        print(f"Error loading test cases: {e}")
+        sys.exit(1)
 
-    get_mesh_stats(args.dataset, params, args.algo)
+    # Loop through all test cases
+    for idx, case in enumerate(test_cases):
+        print(f"\nRunning test case {idx + 1}/{len(test_cases)}:")
+        params = {
+            "start": case.get("start"),
+            "goal": case.get("goal"),
+            "max_iter": case.get("max_iter", 1000),  # Default value if not specified
+            "step_size": case.get("step_size", 5),  # Default value if not specified
+            "test_num": idx + 1,
+            "visualize": args.visualize
+        }
+        print(f"Start: {params['start']}, Goal: {params['goal']}")
+        get_mesh_stats(args.dataset, params, args.algo)
 
 if __name__ == "__main__":
     main()
