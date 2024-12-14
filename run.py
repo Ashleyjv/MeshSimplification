@@ -70,16 +70,6 @@ def get_simplified_mesh(original_points, nested_faces, tg_red=0.5):
     simplified_mesh = pv.PolyData(simplified_points, flat_simplified_faces)
     return simplified_mesh, simplified_points, simplified_faces, mapping
 
-def create_graph(points, faces, max_height=None):
-    graph = nx.Graph()
-    for i, point in enumerate(points):
-        graph.add_node(i, pos=tuple(point))
-    for face in faces:
-        for j in range(len(face)):
-            if max_height is None or abs(points[face[j]][2] - points[face[(j + 1) % len(face)]][2]) <= max_height:
-                graph.add_edge(face[j], face[(j + 1) % len(face)])
-    return graph
-
 def get_graph_stats(points, faces, mesh, params, algo):
     stats = {
         "n_nodes": len(points),
@@ -95,7 +85,8 @@ def get_graph_stats(points, faces, mesh, params, algo):
     
     try:
         rrt = RRT(start=start, goal=goal, mesh=mesh, step_size=params["step_size"], max_iter=params["max_iter"], goal_sample_rate=0.3, search_radius=params["step_size"])
-        graph = LazyGraph(start=start, goal=goal, mesh=mesh, step_size=params["step_size"], max_iter=params["max_iter"], search_radius=params["step_size"])
+        dijgraph = LazyGraph(start=start, goal=goal, mesh=mesh, step_size=params["step_size"], max_iter=params["max_iter"], search_radius=params["step_size"])
+        agraph = LazyGraph(start=start, goal=goal, mesh=mesh, step_size=params["step_size"], max_iter=params["max_iter"], search_radius=params["step_size"])
 
         threads = []
 
@@ -106,14 +97,14 @@ def get_graph_stats(points, faces, mesh, params, algo):
             stats["rrt"] = path
 
         def run_dijkstra():
-            path, dist = graph.dijkstra()
-            stats["dijtime"] = graph.rtime
+            path, dist = dijgraph.dijkstra()
+            stats["dijtime"] = dijgraph.rtime
             stats["dijdist"] = dist
             stats["dijkstra"] = path
 
         def run_astar():
-            path, dist = graph.a_star()
-            stats["astartime"] = graph.rtime
+            path, dist = agraph.a_star()
+            stats["astartime"] = agraph.rtime
             stats["astardist"] = dist
             stats["astar"] = path
 
@@ -134,43 +125,6 @@ def get_graph_stats(points, faces, mesh, params, algo):
         stats["dijkstra"].append(None)
         stats["astar"].append(None)
     return stats
-
-# def visualize(mesh, simplified_mesh, orig_paths, simpl_paths):
-#     debug("Visualizing paths...")
-#     plotter = pv.Plotter(shape=(1, 2))
-
-#     colors = ["red", "black", "orange", "purple"]
-
-#     plotter.subplot(0, 0)
-#     plotter.add_mesh(mesh, color="blue", show_edges=True)
-#     if orig_paths:
-#         try:
-#             orig_paths = np.array(orig_paths)
-#             if orig_paths.ndim == 2 and orig_paths.shape[1] == 3:
-#                 lines = pv.line_segments_from_points(orig_paths)
-#                 plotter.add_mesh(lines, color=colors[0])
-#             else:
-#                 debug("Original paths are not valid for visualization.")
-#         except Exception as e:
-#             debug(f"Error visualizing original paths: {e}")
-#     plotter.add_text("Original Mesh with Path", font_size=10)
-
-#     plotter.subplot(0, 1)
-#     plotter.add_mesh(simplified_mesh, color="green", show_edges=True)
-#     if simpl_paths:
-#         try:
-#             simpl_paths = np.array(simpl_paths)
-#             if simpl_paths.ndim == 2 and simpl_paths.shape[1] == 3:
-#                 lines = pv.line_segments_from_points(simpl_paths)
-#                 plotter.add_mesh(lines, color=colors[0])
-#             else:
-#                 debug("Simplified paths are not valid for visualization.")
-#         except Exception as e:
-#             debug(f"Error visualizing simplified paths: {e}")
-#     plotter.add_text("Simplified Mesh with Path", font_size=10)
-
-#     plotter.link_views()
-#     plotter.show()
 
 def visualize(mesh, simplified_mesh, orig_paths, simpl_paths):
     debug("Visualizing paths...")
