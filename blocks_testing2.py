@@ -117,7 +117,16 @@ def get_graph_stats(points, faces, mesh, params):
             search_radius=params["step_size"]
         )
 
-        graph = LazyGraph(
+        dijgraph = LazyGraph(
+            start=start,
+            goal=goal,
+            mesh=mesh,
+            step_size=params["step_size"],
+            max_iter=params["max_iter"],
+            search_radius=params["step_size"]
+        )
+
+        agraph = LazyGraph(
             start=start,
             goal=goal,
             mesh=mesh,
@@ -128,27 +137,39 @@ def get_graph_stats(points, faces, mesh, params):
 
         # Define target functions for threading
         def run_rrt():
+            # if no rrt arg, skip
             path, dist = rrt.build_rrt()
             stats["rrttime"] = rrt.rtime
             stats["rrtdist"] = dist
             stats["rrt"] = path
 
+        def run_astar():
+            # if no a* arg, skip
+            path, dist = agraph.a_star()
+            stats["atime"] = agraph.rtime
+            stats["adist"] = dist
+            stats["astar"] = path
+
         def run_dijkstra():
-            path, dist = graph.a_star()
-            stats["dijtime"] = graph.rtime
+            # if no dij arg, skip
+            path, dist = dijgraph.dijkstra()
+            stats["dijtime"] = dijgraph.rtime
             stats["dijdist"] = dist
             stats["dijkstra"] = path
 
         # Create threads
         thread_rrt = threading.Thread(target=run_rrt)
+        thread_astar = threading.Thread(target=run_astar)
         thread_dijkstra = threading.Thread(target=run_dijkstra)
 
         # Start threads
         thread_rrt.start()
+        thread_astar.start()
         thread_dijkstra.start()
 
         # Wait for both threads to finish
         thread_rrt.join()
+        thread_astar.join()
         thread_dijkstra.join()
 
         print(stats)
