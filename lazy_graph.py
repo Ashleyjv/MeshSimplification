@@ -43,7 +43,7 @@ class LazyGraph:
         assert(self.is_collision_free(self.start, self.start))
         assert(self.is_collision_free(self.goal, self.goal))
     
-    def upd_tree():
+    def upd_tree(self):
         self.kdtree = KDTree(list(self.distances.keys()))
 
     def is_collision_free(self, from_point, to_point):
@@ -137,7 +137,7 @@ class LazyGraph:
         while self.pq and itr < self.max_iter:
 
             if itr < 100 or itr % 200 == 0:
-                upd_tree()
+                self.upd_tree()
 
             current_dist, current_node = heapq.heappop(self.pq)
 
@@ -189,13 +189,12 @@ class LazyGraph:
 
                 next_node_goal = self.fix_point(next_node_goal)
 
-                if next_node_goal not in self.visited:
-                    if self.is_collision_free(current_node, next_node_goal):
-                        new_dist_goal = current_dist + self.distance(current_node, next_node_goal)
-                        if next_node_goal not in self.distances or new_dist_goal < self.distances[next_node_goal]:
-                            self.distances[next_node_goal] = new_dist_goal
-                            heapq.heappush(self.pq, (new_dist_goal, next_node_goal))
-                            self.tree.add_node(next_node_goal, parent=current_node)
+                if self.is_collision_free(current_node, next_node_goal):
+                    new_dist_goal = current_dist + self.distance(current_node, next_node_goal)
+                    if next_node_goal not in self.distances or new_dist_goal < self.distances[next_node_goal]:
+                        self.distances[next_node_goal] = new_dist_goal
+                        heapq.heappush(self.pq, (new_dist_goal, next_node_goal))
+                        self.tree.add_node(next_node_goal, parent=current_node)
 
             itr += 1
 
@@ -227,6 +226,9 @@ class LazyGraph:
 
             if self.get_distance(current_node) != dist:
                 continue
+
+            if itr < 100 or itr % 200 == 0:
+                self.upd_tree()
 
             # Check if goal is reached within search radius
             distance_to_goal = self.distance(current_node, self.goal)
