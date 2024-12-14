@@ -246,7 +246,7 @@ def get_mesh_stats(dataset_path, params):
         "simplified" : simplified_stats
     }
 
-    with open(dataset_path + '_' + params['test_num'] + '.json') as file:
+    with open(dataset_path + '_' + params['test_num'] + '.json', 'w') as file:
         json.dump(test_results, file, indent=4)
     print(test_results)
     visualize(original_mesh, simplified_mesh, original_stats["dijkstra"], simplified_stats["dijkstra"]) #simplified_stats["rrt"])
@@ -269,7 +269,7 @@ test_suite = [
             "goal" : [270.5884959,  525.02272572,  74.67635382],
             "max_iter" : 5000,
             "step_size" : 3,
-            "test_num" : 1
+            "test_num" : '1'
         }
     ),
     # (

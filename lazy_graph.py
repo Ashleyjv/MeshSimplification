@@ -7,6 +7,8 @@ import sys
 import time
 import heapq
 
+EPS = 0.1
+
 def debug(*args, sep=' ', end='\n', file=None, flush=False):
     # Check the environment variable
     if False:
@@ -21,8 +23,8 @@ class LazyGraph:
                  max_iter=10000,
                  search_radius=2.0):
 
-        self.start = np.array(start)
-        self.goal = np.array(goal)
+        self.start = tuple(start)
+        self.goal = tuple(goal)
         self.mesh = mesh
         self.mpoints = mesh.points.tolist()
         self.step_size = step_size
@@ -32,15 +34,18 @@ class LazyGraph:
         self.tree.add_node(tuple(self.start), parent=None)
         self.rtime = 0
         # For nearest neighbor search
+        self.kdtree = KDTree([self.start])
         self.pq = []
         self.distances = {}
-        self.visited = set()
 
         print("Mesh Bounds:", mesh.bounds)
 
         assert(self.is_collision_free(self.start, self.start))
         assert(self.is_collision_free(self.goal, self.goal))
     
+    def upd_tree():
+        self.kdtree = KDTree(list(self.distances.keys()))
+
     def is_collision_free(self, from_point, to_point):
         # Use PyVista's intersect_with_line method
         # It returns a tuple (points, ids)
@@ -102,6 +107,12 @@ class LazyGraph:
     def get_distance(self, node):
         return self.distances[tuple(node)]
     
+    def fix_point(self, point):
+        nearest_pt = self.kdtree.query(point)[0]
+        if self.distance(point, nearest_pt) <= EPS:
+            return nearest_pt
+        return point
+
     def dijkstra(self):
         """
         Builds the RRT tree using Dijkstra's algorithm.
@@ -121,8 +132,13 @@ class LazyGraph:
 
         heapq.heappush(self.pq, (0, self.start))
         self.set_distance(self.start, 0)        
+        itr = 0
 
-        while self.pq and self.max_iter > 0:
+        while self.pq and itr < self.max_iter:
+
+            if itr < 100 or itr % 200 == 0:
+                upd_tree()
+
             current_dist, current_node = heapq.heappop(self.pq)
 
             if self.get_distance(current_node) != current_dist:
@@ -148,15 +164,14 @@ class LazyGraph:
                     current_node[2] + dz * self.step_size
                 )
 
-                if next_node in self.visited:
-                    continue
+                next_node = self.fix_point(next_node)
 
                 if not self.is_collision_free(current_node, next_node):
                     continue  # Collision detected, skip this node
 
                 new_dist = current_dist + self.distance(current_node, next_node)
 
-                if next_node not in self.distances or new_dist < self.distances[next_node]:
+                if next_node not in self.distances or new_dist < self.get_distance(next_node):
                     self.set_distance(next_node, new_dist)
                     heapq.heappush(self.pq, (new_dist, next_node))
                     self.tree.add_node(next_node, parent=current_node)
@@ -172,7 +187,7 @@ class LazyGraph:
                     current_node[2] + direction_unit[2] * self.step_size
                 )
 
-                next_node_goal = tuple(next_node_goal)
+                next_node_goal = self.fix_point(next_node_goal)
 
                 if next_node_goal not in self.visited:
                     if self.is_collision_free(current_node, next_node_goal):
@@ -182,7 +197,7 @@ class LazyGraph:
                             heapq.heappush(self.pq, (new_dist_goal, next_node_goal))
                             self.tree.add_node(next_node_goal, parent=current_node)
 
-            self.max_iter -= 1
+            itr += 1
 
         debug("Reached maximum iterations without finding a path.")
         return None, None
@@ -204,7 +219,8 @@ class LazyGraph:
         heapq.heappush(self.pq, (0 + self.heuristic(self.start), self.start))
         self.set_distance(self.start, 0)
 
-        while self.pq and self.max_iter > 0:
+        itr = 0
+        while self.pq and itr < self.max_iter:
             current_f, current_node = heapq.heappop(self.pq)
 
             dist = current_f - self.heuristic(current_node)
@@ -232,6 +248,8 @@ class LazyGraph:
                     current_node[2] + dz * self.step_size
                 )
 
+                next_node = self.fix_point(next_node)
+
                 if not self.is_collision_free(current_node, next_node):
                     continue  # Collision detected, skip this node
 
@@ -254,7 +272,7 @@ class LazyGraph:
                     current_node[2] + direction_unit[2] * self.step_size
                 )
 
-                next_node_goal = tuple(next_node_goal)
+                next_node_goal = self.fix_point(next_node_goal)
 
                 if self.is_collision_free(current_node, next_node_goal):
                     tentative_g_goal = dist + self.distance(current_node, next_node_goal)
@@ -264,7 +282,7 @@ class LazyGraph:
                         heapq.heappush(self.pq, (f_score_goal, next_node_goal))
                         self.tree.add_node(next_node_goal, parent=current_node)
 
-            self.max_iter -= 1
+            itr += 1
 
         debug("Reached maximum iterations without finding a path.")
         self.rtime = time.time() - start_time
