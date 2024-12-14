@@ -241,7 +241,7 @@ def main():
         params = {
             "start": case.get("start"),
             "goal": case.get("goal"),
-            "max_iter": case.get("max_iter", 1000),  # Default value if not specified
+            "max_iter": case.get("max_iter", 50000),  # Default value if not specified
             "step_size": case.get("step_size", 5),  # Default value if not specified
             "test_num": idx + 1,
             "visualize": args.visualize
