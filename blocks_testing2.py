@@ -257,7 +257,7 @@ test_suite = [
             "seed" : 420,
             "test_num" : '1'
         }
-    ),
+    )
     # (
     #     "dataset/city.stl", {
     #         "start" : [345.61178723, 567.61959214,  76.7230741 ],
@@ -314,6 +314,7 @@ test_suite = [
 
 # Can pass max_height arg for each dataset file
 for (dataset_path, params) in test_suite:
+    print("Running:", dataset_path, params)
     get_mesh_stats(dataset_path, params)
 
 

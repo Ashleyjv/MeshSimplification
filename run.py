@@ -238,10 +238,25 @@ def get_mesh_stats(dataset_path, params, algo):
         })
 
     debug("Creating graphs for pathfinding...")
-    original_stats = get_graph_stats(original_points, nested_faces, original_mesh, params, algo)
-    simplified_stats = get_graph_stats(simplified_points, simplified_faces, simplified_mesh, params, algo)
 
-    test_results = params | {"file": dataset_path, "original": original_stats, "simplified": simplified_stats}
+    test_results = params | {"file": dataset_path, "original": None, "simplified": None}
+    def run_original():
+        original_stats = get_graph_stats(original_points, nested_faces, original_mesh, params, algo)
+        test_results["original"] = original_stats
+
+    def run_simplified():
+        simplified_stats = get_graph_stats(simplified_points, simplified_faces, simplified_mesh, params, algo)
+        test_results["simplified"] = simplified_stats
+
+    orig_th = threading.Thread(target=run_original)
+    simpl_th = threading.Thread(target=run_simplified)
+
+    orig_th.start()
+    simpl_th.start()
+    
+    orig_th.join()
+    simpl_th.join()
+ 
     output_path = f"{dataset_path}_{params['test_num']}.json"
     with open(output_path, 'w') as file:
         json.dump(test_results, file, indent=4)
