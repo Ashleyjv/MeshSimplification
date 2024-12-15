@@ -92,6 +92,17 @@ python3 visualize_dataset_tests.py --dataset dataset/city.stl \
                                    --num_cases 10 \
                                    --visualize
 ```
+---
+## Analysis:
+
+Analysis of generated data is performed using the num_data.py and vis_data.py scripts located in the Analysis directory.
+
+num_data.py: calculates and output summary statistics and visualizations. (Update data field required)
+
+vis_data.py: Generate visualizations for statistics per test, which are automatically saved in the output directory. (Update data field required)
+
+Ensure you update the respective data fields in these scripts before running them for accurate results.
+
 
 ---
 
