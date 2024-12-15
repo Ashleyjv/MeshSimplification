@@ -10,7 +10,9 @@ Pathfinding in 3D environments is a critical challenge in robotics, often constr
 
 Install the required Python libraries:
 ```bash
-pip3 install -r requirements.txt
+pip3 install -r requirements_test.txt
+pip3 install -r requirements_docs.txt
+
 ```
 
 ### Installing
