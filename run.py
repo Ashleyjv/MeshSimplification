@@ -168,6 +168,14 @@ def visualize(mesh, simplified_mesh, orig_paths, simpl_paths):
     plotter.show()
 
 
+def check(original_mesh, simplified_mesh, output_path):
+    with open(output_path, 'r') as file:
+        data = json.load(file)
+    original_stats = data["original"]
+    simplified_stats = data["simplified"]
+    visualize(original_mesh, simplified_mesh, original_stats.get("rrt", []), simplified_stats.get("rrt", []))
+    sys.exit(0)
+
 def get_mesh_stats(dataset_path, params, algo):
     original_data_path = dataset_path + '_original.json'
     simplified_data_path = dataset_path + '_simplified.json'
@@ -190,6 +198,9 @@ def get_mesh_stats(dataset_path, params, algo):
             "points": simplified_points,
             "faces": simplified_faces
         })
+
+    output_path = f"{dataset_path}_{params['test_num']}.json"
+    check(original_mesh, simplified_mesh, output_path)
 
     debug("Creating graphs for pathfinding...")
 
@@ -235,8 +246,11 @@ def main():
         print(f"Error loading test cases: {e}")
         sys.exit(1)
 
+
     # Loop through all test cases
     for idx, case in enumerate(test_cases):
+        if idx != 2:
+            continue
         print(f"\nRunning test case {idx + 1}/{len(test_cases)}:")
         params = {
             "start": case.get("start"),
@@ -248,6 +262,7 @@ def main():
         }
         print(f"Start: {params['start']}, Goal: {params['goal']}")
         get_mesh_stats(args.dataset, params, args.algo)
+
 
 if __name__ == "__main__":
     main()
